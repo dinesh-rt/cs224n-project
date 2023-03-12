@@ -4,6 +4,9 @@ import re
 from urllib.parse import urlsplit
 from github import Github
 import os
+import ast
+import astor
+from nltk.tokenize import RegexpTokenizer
 
 def parse_url(url):
     text_url, line = url.split("#")
@@ -11,12 +14,61 @@ def parse_url(url):
     start = re.split("\D+",start_str)[1]
     end = re.split("\D+",end_str)[1]
     url=urlsplit(text_url).path
-    user,repo,sha,file_path = re.findall('(\w+)/(\w+)/blob/(\w+)/([\w/.]+)', url)[0]
+    user,repo,sha,file_path = re.findall('(\w+)/([-/.\w]+)/blob/(\w+)/([\w/.]+)', url)[0]
     return user,repo,sha,file_path,start,end 
 
 def get_token_from_file():
     with open('token.txt' ,'r') as f:
         return f.read().strip()
+
+def tokenize_docstring(text):
+    """Gets filetered docstring tokens which help describe the function"""
+
+    # Remove decorators and other parameter signatures in the docstring
+    before_keyword, keyword, after_keyword = text.partition(':')
+    before_keyword, keyword, after_keyword = before_keyword.partition('@param')
+    before_keyword, keyword, after_keyword = before_keyword.partition('param')
+    before_keyword, keyword, after_keyword = before_keyword.partition('@brief')
+
+    if(after_keyword):
+        words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(after_keyword)
+    else:
+        before_keyword, keyword, after_keyword = before_keyword.partition('@')
+        words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(before_keyword)
+
+    # Convert all docstrings to lowercase
+    new_words= [word.lower() for word in words if word.isalnum()]
+
+    return new_words
+
+
+def tokenize_code(text):
+    """Gets filetered fucntion tokens"""
+
+    # Remove decorators and function signatures till the def token
+    keyword = 'def '
+    before_keyword, keyword, after_keyword = text.partition(keyword)
+    words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(after_keyword)
+
+    # Convert function tokens to lowercase and remove single alphabet variables
+    new_words= [word.lower() for word in words if (word.isalpha() and len(word)>1) or (word.isnumeric())]
+    return new_words
+
+def get_function_details_from_string(input_str):
+    return_functions = []
+    input_ast = ast.parse(input_str)
+    input_classes = [seg for seg in input_ast.body if isinstance(seg, ast.ClassDef)]
+    input_functions = [seg for seg in input_ast.body if isinstance(seg, ast.FunctionDef)]
+    for class1 in input_classes:
+        input_functions.extend([seg for seg in class1.body if isinstance(seg, ast.FunctionDef)])
+    for func in input_functions:
+        docstring = ast.get_docstring(func) if ast.get_docstring(func) else ''
+        function_full = astor.to_source(func)
+        function_code = function_full.replace(ast.get_docstring(func, clean=False), "") if docstring else function_full
+        function_token = ' '.join(tokenize_code(function_code))
+        docstring_token = ' '.join(tokenize_docstring(docstring.split('\n\n')[0]))
+        return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
+    return return_functions
 
 def download_file(url):
     user,repo_name,sha,file_path,start,end = parse_url(url)
@@ -32,8 +84,18 @@ def download_file(url):
 	    f.write(decoded)
     #read lines in a range
     with open("temp.txt", 'r') as f:
-	    func = f.readlines()[int(start)-1:int(end)]
-	    print(func)
+            func = f.readlines()[int(start)-1:int(end)]
+            print(func)
+            #print("".join(func).lstrip())
+            try:
+                function_details = get_function_details_from_string("".join(func).lstrip())
+                print((function_details), function_details[0][0])
+            except(SyntaxError):
+                pass
+            #module = ast.parse("def aa(self):\n     print('hello world')")
+            #print("****")
+            # functions = [node for node in module.body if isinstance(node, ast.FunctionDef)]
+            # print(module, ' '.join(tokenize_code(functions)))
     os.remove("temp.txt")
 
 def run_preprocess():
@@ -67,7 +129,7 @@ def run_preprocess():
 
     #now get the first index in the url_df and print
     for index, row in enumerate(url_df.itertuples()):
-        if index == 0:
+        if index != 4 and index != 5:
             url = row.GitHubUrl
             print(f"url: {url}")
             download_file(url)
