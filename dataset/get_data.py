@@ -32,7 +32,7 @@ def download_file(url):
 	    f.write(decoded)
     #read lines in a range
     with open("temp.txt", 'r') as f:
-	    func = f.readlines()[int(start):int(end)]
+	    func = f.readlines()[int(start)-1:int(end)]
 	    print(func)
     os.remove("temp.txt")
 
