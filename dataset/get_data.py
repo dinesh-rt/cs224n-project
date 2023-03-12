@@ -1,18 +1,40 @@
 from fast_ml.model_development import train_valid_test_split
 import pandas as pd
 import re
+from urllib.parse import urlsplit
+from github import Github
+import os
 
 def parse_url(url):
     text_url, line = url.split("#")
     start_str,end_str = re.split("-", line)
     start = re.split("\D+",start_str)[1]
     end = re.split("\D+",end_str)[1]
-    return text_url, start, end 
+    url=urlsplit(text_url).path
+    user,repo,sha,file_path = re.findall('(\w+)/(\w+)/blob/(\w+)/([\w/.]+)', url)[0]
+    return user,repo,sha,file_path,start,end 
+
+def get_token_from_file():
+    with open('token.txt' ,'r') as f:
+        return f.read().strip()
 
 def download_file(url):
-    text_url, start, end = parse_url(url)
-    print(text_url)
-
+    user,repo_name,sha,file_path,start,end = parse_url(url)
+    print(f"user: {user}, repo: {repo_name}, file_path: {file_path}, start: {start}, end: {end}")
+    token = get_token_from_file()
+    g = Github(token)
+    print(token)
+    print(f'{user}/{repo_name}/{file_path}')
+    repo = g.get_repo(f'{user}/{repo_name}')
+    contents = repo.get_contents(file_path)
+    decoded = contents.decoded_content
+    with open("temp.txt", 'wb') as f:
+	    f.write(decoded)
+    #read lines in a range
+    with open("temp.txt", 'r') as f:
+	    func = f.readlines()[int(start):int(end)]
+	    print(func)
+    os.remove("temp.txt")
 
 def run_preprocess():
     df=pd.read_csv('queries.csv')
