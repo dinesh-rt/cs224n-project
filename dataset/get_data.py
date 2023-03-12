@@ -7,11 +7,11 @@ def parse_url(url):
     start_str,end_str = re.split("-", line)
     start = re.split("\D+",start_str)[1]
     end = re.split("\D+",end_str)[1]
-    
+    return text_url, start, end 
 
 def download_file(url):
     text_url, start, end = parse_url(url)
-
+    print(text_url)
 
 
 def run_preprocess():
@@ -50,5 +50,5 @@ def run_preprocess():
             print(f"url: {url}")
             download_file(url)
 
-if __init__ == "main":
+if __name__ == "__main__":
     run_preprocess()
