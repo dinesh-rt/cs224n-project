@@ -39,6 +39,7 @@ import astor
 from nltk.tokenize import RegexpTokenizer
 import json
 from docopt import docopt
+from os.path import exists
 
 def parse_url(url):
     text_url, line = url.split("#")
@@ -190,7 +191,9 @@ def run_preprocess():
 
 
     #iterate through the training queries
-    os.remove("train.jsonl")
+    file_exists = exists("train.jsonl")
+    if file_exists:
+        os.remove("train.jsonl")
     for index,row in enumerate(y_train):
         if dry_run and index == 0:
             print(f"query : {row}")
