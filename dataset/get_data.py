@@ -3,7 +3,7 @@
 Generate CodeSearchNet compatible Data from open source repos.
 
 Usage:
-    get_data.py -d [-q QUERY_CSV] [-a ANNOTATIONS_CSV] [-o DATA_CSV]
+    get_data.py [-d] [-q QUERY_CSV] [-a ANNOTATIONS_CSV] [-o DATA_CSV]
     get_data.py -h | --help
 
 Options:
@@ -71,7 +71,6 @@ def tokenize_docstring(text):
 
     # Convert all docstrings to lowercase
     new_words= [word.lower() for word in words if word.isalnum()]
-
     return new_words
 
 
@@ -98,13 +97,13 @@ def get_function_details_from_string(input_str):
         docstring = ast.get_docstring(func) if ast.get_docstring(func) else ''
         function_full = astor.to_source(func)
         function_code = function_full.replace(ast.get_docstring(func, clean=False), "") if docstring else function_full
-        function_token = ' '.join(tokenize_code(function_code))
+        function_token = tokenize_code(function_code)
         docstring_token = ' '.join(tokenize_docstring(docstring.split('\n\n')[0]))
         return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
     return return_functions
 
 idx=0
-def prepare_dataset(url, query):
+def prepare_dataset(url, query, filename):
     global idx
     result_dict = {}
     user,repo_name,sha,file_path,start,end = parse_url(url)
@@ -134,11 +133,11 @@ def prepare_dataset(url, query):
                 result_dict["code"] = function_details[0][1]
                 result_dict["code_tokens"] = function_details[0][2]
                 result_dict["docstring"] = query
-                result_dict["docstring_tokens"] = ' '.join(tokenize_docstring(query.split('\n\n')[0]))
+                result_dict["docstring_tokens"] = tokenize_docstring(query.split('\n\n')[0])
                 result_dict["idx"] = idx
                 idx += 1
                 json_object = json.dumps(result_dict)
-                with open("train.jsonl", "a") as outfile:
+                with open(filename, "a") as outfile:
                     outfile.write(json_object)
                     outfile.write("\n")
             except:
@@ -149,7 +148,7 @@ def prepare_dataset(url, query):
             # print(module, ' '.join(tokenize_code(functions)))
     os.remove("temp.txt")
 
-def fetch_annotations(ann_df, query, dry_run):
+def fetch_annotations(ann_df, query, dry_run, filename):
     url_df = ann_df[(ann_df["Language"] == "Python") & (ann_df["Query"] == query)]
     #url_df is a dataframe
     #drop duplicate URLs
@@ -157,10 +156,11 @@ def fetch_annotations(ann_df, query, dry_run):
 
     #now get the first index in the url_df and print
     for index, row in enumerate(url_df.itertuples()):
-        if dry_run and index == 0:
-            url = row.GitHubUrl
-            print(f"url: {url}")
-            prepare_dataset(url, query)
+        if dry_run and index > 0:
+            break
+        url = row.GitHubUrl
+        print(f"url: {url}")
+        prepare_dataset(url, query, filename)
 
 
 def run_preprocess():
@@ -195,10 +195,27 @@ def run_preprocess():
     if file_exists:
         os.remove("train.jsonl")
     for index,row in enumerate(y_train):
-        if dry_run and index == 0:
-            print(f"query : {row}")
-            fetch_annotations(ann_df, row, dry_run)
-
+        if dry_run and index > 0:
+            break
+        print(f"query : {row}")
+        fetch_annotations(ann_df, row, dry_run, "train.jsonl")
+    file_exists = exists("valid.jsonl")
+    if file_exists:
+        os.remove("valid.jsonl")
+    for index,row in enumerate(y_valid):
+        if dry_run and index > 0:
+            break
+        print(f"query : {row}")
+        fetch_annotations(ann_df, row, dry_run, "valid.jsonl")
+    file_exists = exists("test.jsonl")
+    if file_exists:
+        os.remove("test.jsonl")
+    for index,row in enumerate(y_test):
+        if dry_run and index > 0:
+            break
+        print(f"query : {row}")
+        fetch_annotations(ann_df, row, dry_run, "test.jsonl")
+    
 
 if __name__ == "__main__":
     args = docopt(__doc__)
