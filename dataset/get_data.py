@@ -7,6 +7,9 @@ import os
 import ast
 import astor
 from nltk.tokenize import RegexpTokenizer
+import json
+
+idx = 0
 
 def parse_url(url):
     text_url, line = url.split("#")
@@ -70,7 +73,11 @@ def get_function_details_from_string(input_str):
         return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
     return return_functions
 
-def download_file(url):
+idx=0
+
+def download_file(url, query):
+    global idx
+    result_dict = {}
     user,repo_name,sha,file_path,start,end = parse_url(url)
     print(f"user: {user}, repo: {repo_name}, file_path: {file_path}, start: {start}, end: {end}")
     token = get_token_from_file()
@@ -90,6 +97,21 @@ def download_file(url):
             try:
                 function_details = get_function_details_from_string("".join(func).lstrip())
                 print((function_details), function_details[0][0])
+                result_dict["url"] = url
+                result_dict["repo"] = repo_name
+                result_dict["func_name"] = function_details[0][0]
+                result_dict["original_string"] = func
+                result_dict["language"] = "python"
+                result_dict["code"] = function_details[0][1]
+                result_dict["code_tokens"] = function_details[0][2]
+                result_dict["docstring"] = query
+                result_dict["docstring_tokens"] = ' '.join(tokenize_docstring(query.split('\n\n')[0]))
+                result_dict["idx"] = idx
+                idx += 1
+                json_object = json.dumps(result_dict)
+                with open("train.jsonl", "a") as outfile:
+                    outfile.write(json_object)
+                    outfile.write("\n")
             except(SyntaxError):
                 pass
             #module = ast.parse("def aa(self):\n     print('hello world')")
@@ -110,7 +132,7 @@ def fetch_annotations(ann_df, query):
         #if index != 4 and index != 5:
         url = row.GitHubUrl
         print(f"url: {url}")
-        download_file(url)
+        download_file(url, query)
 
 
 def run_preprocess():
@@ -132,6 +154,7 @@ def run_preprocess():
 
 
     #iterate through the training queries
+    os.remove("train.jsonl")
     for index,row in enumerate(y_train):
         #if index == 0:
         print(f"query : {row}")
