@@ -1,3 +1,33 @@
+#!/usr/bin/env python
+"""
+Generate CodeSearchNet compatible Data from open source repos.
+
+Usage:
+    get_data.py -d [-q QUERY_CSV] [-a ANNOTATIONS_CSV] [-o DATA_CSV]
+    get_data.py -h | --help
+
+Options:
+    -h --help                       Show command line options
+    -d --dry_run                    Run only for one entry in annotations.csv
+                                    [default: False]
+    -q --query_csv FILENAME         CSV filename for NL queries
+                                    [default: queries.csv]
+    -a --annotation_csv FILENAME    CSV filename for annotations
+                                    [default: annotations.csv]
+    -o --output_csv FILENAME        CSV filename for CodeSearchNet dataset
+                                    [default: output.csv]
+
+Examples:
+    ./get_data.py -d
+    ./get_data.py -q examples.csv
+"""
+
+"""
+This script prepares the dataset compatible for CodeSearchNet Challenge, given
+- queries.csv file which has the NL queries
+- annotations.csv file which has the annotations
+Run with "-h" to see full command line options
+"""
 from fast_ml.model_development import train_valid_test_split
 import pandas as pd
 import re
@@ -7,6 +37,7 @@ import os
 import ast
 import astor
 from nltk.tokenize import RegexpTokenizer
+from docopt import docopt
 
 def parse_url(url):
     text_url, line = url.split("#")
@@ -70,7 +101,7 @@ def get_function_details_from_string(input_str):
         return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
     return return_functions
 
-def download_file(url):
+def prepare_dataset(url):
     user,repo_name,sha,file_path,start,end = parse_url(url)
     print(f"user: {user}, repo: {repo_name}, file_path: {file_path}, start: {start}, end: {end}")
     token = get_token_from_file()
@@ -90,7 +121,7 @@ def download_file(url):
             try:
                 function_details = get_function_details_from_string("".join(func).lstrip())
                 print((function_details), function_details[0][0])
-            except(SyntaxError):
+            except:
                 pass
             #module = ast.parse("def aa(self):\n     print('hello world')")
             #print("****")
@@ -98,8 +129,7 @@ def download_file(url):
             # print(module, ' '.join(tokenize_code(functions)))
     os.remove("temp.txt")
 
-def fetch_annotations(ann_df, query):
-    #query = "priority queue"
+def fetch_annotations(ann_df, query, dry_run):
     url_df = ann_df[(ann_df["Language"] == "Python") & (ann_df["Query"] == query)]
     #url_df is a dataframe
     #drop duplicate URLs
@@ -107,19 +137,28 @@ def fetch_annotations(ann_df, query):
 
     #now get the first index in the url_df and print
     for index, row in enumerate(url_df.itertuples()):
-        #if index != 4 and index != 5:
-        url = row.GitHubUrl
-        print(f"url: {url}")
-        download_file(url)
+        if dry_run and index == 0:
+            url = row.GitHubUrl
+            print(f"url: {url}")
+            prepare_dataset(url)
 
 
 def run_preprocess():
-    df=pd.read_csv('queries.csv')
-    #load the annotationStore.csv
-    ann_df = pd.read_csv("annotations.csv")
+    #load the queries
+    queries_file = args.get('--query_csv')
+    df=pd.read_csv(queries_file)
+    #load the annotations.csv, filtered files
+    annotations_file = args.get('--annotation_csv')
+    ann_df = pd.read_csv(annotations_file)
 
+    #check for dry run
+    dry_run = args.get('--dry_run')
     #split the data into train, valid, test
-    x_train, y_train, x_valid, y_valid, x_test, y_test = train_valid_test_split(df, target='query', train_size=0.7, valid_size = 0.15, test_size =0.15)
+    x_train, y_train, x_valid, y_valid, x_test, y_test = train_valid_test_split(df,
+                                                                                target='query',
+                                                                                train_size=0.7,
+                                                                                valid_size = 0.15,
+                                                                                test_size =0.15)
 
     #reset the index
     for data in [x_train, y_train, x_valid, y_valid, x_test, y_test]:
@@ -133,10 +172,11 @@ def run_preprocess():
 
     #iterate through the training queries
     for index,row in enumerate(y_train):
-        #if index == 0:
-        print(f"query : {row}")
-        fetch_annotations(ann_df, row)
+        if dry_run and index == 0:
+            print(f"query : {row}")
+            fetch_annotations(ann_df, row, dry_run)
 
 
 if __name__ == "__main__":
+    args = docopt(__doc__)
     run_preprocess()
