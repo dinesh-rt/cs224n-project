@@ -1,3 +1,0 @@
-[submodule "CodeXGLUE"]
-	path = CodeXGLUE
-	url = git@github.com:microsoft/CodeXGLUE.git
