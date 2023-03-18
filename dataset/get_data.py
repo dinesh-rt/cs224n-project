@@ -3,19 +3,23 @@
 Generate CodeSearchNet compatible Data from open source repos.
 
 Usage:
-    get_data.py [-d] [-q QUERY_CSV] [-a ANNOTATIONS_CSV] [-o DATA_CSV]
+    get_data.py [-d] [-q QUERY_CSV] [-a ANNOTATIONS_CSV] [-o DATA_CSV] [-f FOLDER_PATH] [-m PROCESSING_METHOD]
     get_data.py -h | --help
 
 Options:
-    -h --help                       Show command line options
-    -d --dry_run                    Run only for one entry in annotations.csv
-                                    [default: False]
-    -q --query_csv FILENAME         CSV filename for NL queries
-                                    [default: queries.csv]
-    -a --annotation_csv FILENAME    CSV filename for annotations
-                                    [default: annotations.csv]
-    -o --output_csv FILENAME        CSV filename for CodeSearchNet dataset
-                                    [default: output.csv]
+    -h --help                                      Show command line options
+    -d --dry_run                                   Run only for one entry in annotations.csv
+                                                   [default: False]
+    -q --query_csv FILENAME                        CSV filename for NL queries
+                                                   [default: queries.csv]
+    -a --annotation_csv FILENAME                   CSV filename for annotations
+                                                   [default: annotations.csv]
+    -o --output_csv FILENAME                       CSV filename for CodeSearchNet dataset
+                                                   [default: output.csv]
+    -f --folder_path FOLDERPATH                    Folder path for the generate data
+                                                   [default: ./]
+    -m --preprocessing_method PROCESSINGMETHOD     Select method to process data, Supported - 0(code as code token), 1 (code+docstring as code token)
+                                                   [default: 0]
 
 Examples:
     ./get_data.py -d
@@ -98,12 +102,12 @@ def get_function_details_from_string(input_str):
         function_full = astor.to_source(func)
         function_code = function_full.replace(ast.get_docstring(func, clean=False), "") if docstring else function_full
         function_token = tokenize_code(function_code)
-        docstring_token = ' '.join(tokenize_docstring(docstring.split('\n\n')[0]))
+        docstring_token = tokenize_docstring(docstring.split('\n\n')[0])
         return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
     return return_functions
 
 idx=0
-def prepare_dataset(url, query, filename):
+def prepare_dataset(url, query, filename, preprocessing_method):
     global idx
     result_dict = {}
     user,repo_name,sha,file_path,start,end = parse_url(url)
@@ -124,14 +128,17 @@ def prepare_dataset(url, query, filename):
             #print("".join(func).lstrip())
             try:
                 function_details = get_function_details_from_string("".join(func).lstrip())
-                print((function_details), function_details[0][0])
                 result_dict["url"] = url
                 result_dict["repo"] = repo_name
                 result_dict["func_name"] = function_details[0][0]
                 result_dict["original_string"] = func
                 result_dict["language"] = "python"
-                result_dict["code"] = function_details[0][1]
-                result_dict["code_tokens"] = function_details[0][2]
+                if ((preprocessing_method == "1")):
+                    result_dict["code"] = function_details[0][1] + function_details[0][3]
+                    result_dict["code_tokens"] = function_details[0][2] + function_details[0][4]
+                else:
+                    result_dict["code"] = function_details[0][1]
+                    result_dict["code_tokens"] = function_details[0][2]
                 result_dict["docstring"] = query
                 result_dict["docstring_tokens"] = tokenize_docstring(query.split('\n\n')[0])
                 result_dict["idx"] = idx
@@ -148,7 +155,7 @@ def prepare_dataset(url, query, filename):
             # print(module, ' '.join(tokenize_code(functions)))
     os.remove("temp.txt")
 
-def fetch_annotations(ann_df, query, dry_run, filename):
+def fetch_annotations(ann_df, query, dry_run, filename, preprocessing_method):
     url_df = ann_df[(ann_df["Language"] == "Python") & (ann_df["Query"] == query)]
     #url_df is a dataframe
     #drop duplicate URLs
@@ -160,7 +167,7 @@ def fetch_annotations(ann_df, query, dry_run, filename):
             break
         url = row.GitHubUrl
         print(f"url: {url}")
-        prepare_dataset(url, query, filename)
+        prepare_dataset(url, query, filename, preprocessing_method)
 
 
 def run_preprocess():
@@ -179,6 +186,16 @@ def run_preprocess():
                                                                                 train_size=0.7,
                                                                                 valid_size = 0.15,
                                                                                 test_size =0.15)
+    #folder where files would be dumped.
+    folder_path = args.get("--folder_path")
+    if not exists(folder_path):
+        os.mkdir(folder_path)
+    train_path = folder_path+"/train.jsonl"
+    valid_path = folder_path+"/valid.jsonl"
+    test_path = folder_path+"/test.jsonl"
+
+    #Choose Preprocessing method
+    preprocessing_method = args.get("--preprocessing_method")
 
     #reset the index
     for data in [x_train, y_train, x_valid, y_valid, x_test, y_test]:
@@ -191,30 +208,30 @@ def run_preprocess():
 
 
     #iterate through the training queries
-    file_exists = exists("train.jsonl")
+    file_exists = exists(train_path)
     if file_exists:
-        os.remove("train.jsonl")
+        os.remove(train_path)
     for index,row in enumerate(y_train):
         if dry_run and index > 0:
             break
         print(f"query : {row}")
-        fetch_annotations(ann_df, row, dry_run, "train.jsonl")
-    file_exists = exists("valid.jsonl")
+        fetch_annotations(ann_df, row, dry_run, train_path, preprocessing_method)
+    file_exists = exists(valid_path)
     if file_exists:
-        os.remove("valid.jsonl")
+        os.remove(valid_path)
     for index,row in enumerate(y_valid):
         if dry_run and index > 0:
             break
         print(f"query : {row}")
-        fetch_annotations(ann_df, row, dry_run, "valid.jsonl")
-    file_exists = exists("test.jsonl")
+        fetch_annotations(ann_df, row, dry_run, valid_path, preprocessing_method)
+    file_exists = exists(test_path)
     if file_exists:
-        os.remove("test.jsonl")
+        os.remove(test_path)
     for index,row in enumerate(y_test):
         if dry_run and index > 0:
             break
         print(f"query : {row}")
-        fetch_annotations(ann_df, row, dry_run, "test.jsonl")
+        fetch_annotations(ann_df, row, dry_run, test_path, preprocessing_method)
     
 
 if __name__ == "__main__":
