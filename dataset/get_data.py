@@ -138,8 +138,12 @@ def prepare_dataset(url, query, filename, preprocessing_method):
                 else:
                     result_dict["code"] = function_details[0][1]
                     result_dict["code_tokens"] = function_details[0][2]
-                result_dict["docstring"] = query
-                result_dict["docstring_tokens"] = tokenize_docstring(query.split('\n\n')[0])
+                if ((preprocessing_method == "2")):
+                    result_dict["docstring"] = function_details[0][3]
+                    result_dict["docstring_tokens"] = function_details[0][4]
+                else:
+                    result_dict["docstring"] = query
+                    result_dict["docstring_tokens"] = tokenize_docstring(query.split('\n\n')[0])
                 result_dict["idx"] = idx
                 idx += 1
                 json_object = json.dumps(result_dict)
