@@ -125,7 +125,6 @@ def prepare_dataset(url, query, filename, preprocessing_method):
     with open("temp.txt", 'r') as f:
             func = f.readlines()[int(start)-1:int(end)]
             print(func)
-            #print("".join(func).lstrip())
             try:
                 function_details = get_function_details_from_string("".join(func).lstrip())
                 result_dict["url"] = url
@@ -149,10 +148,6 @@ def prepare_dataset(url, query, filename, preprocessing_method):
                     outfile.write("\n")
             except:
                 pass
-            #module = ast.parse("def aa(self):\n     print('hello world')")
-            #print("****")
-            # functions = [node for node in module.body if isinstance(node, ast.FunctionDef)]
-            # print(module, ' '.join(tokenize_code(functions)))
     os.remove("temp.txt")
 
 def fetch_annotations(ann_df, query, dry_run, filename, preprocessing_method):
