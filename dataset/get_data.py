@@ -58,51 +58,61 @@ def get_token_from_file():
     with open('token.txt' ,'r') as f:
         return f.read().strip()
 
-def tokenize_docstring(text):
-    """Gets filetered docstring tokens which help describe the function"""
+# This function implementation is based on the implementation at
+# https://github.com/TheScript96/Semantic-code-search-using-BERT-and-transformer/blob/master/Part-I%20Data%20Collection%20%26%20Preprocessing.ipynb
+def docstring_tokenization(docstring):
+    prior_key, key, post_key = docstring.partition(':')
+    prior_key, key, post_key = prior_key.partition('@param')
+    prior_key, key, post_key = prior_key.partition('param')
+    prior_key, key, post_key = prior_key.partition('@brief')
 
-    # Remove decorators and other parameter signatures in the docstring
-    before_keyword, keyword, after_keyword = text.partition(':')
-    before_keyword, keyword, after_keyword = before_keyword.partition('@param')
-    before_keyword, keyword, after_keyword = before_keyword.partition('param')
-    before_keyword, keyword, after_keyword = before_keyword.partition('@brief')
-
-    if(after_keyword):
-        words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(after_keyword)
+    if(post_key):
+        words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(post_keyd)
     else:
-        before_keyword, keyword, after_keyword = before_keyword.partition('@')
-        words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(before_keyword)
+        prior_key, key, post_key = prior_key.partition('@')
+        string = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(prior_key)
 
-    # Convert all docstrings to lowercase
-    new_words= [word.lower() for word in words if word.isalnum()]
-    return new_words
+    for word in string:
+        if word.isalnum():
+            lowerword = word.lower()
+            docstring_token.append(lowerword)
+    return docstring_token
 
 
-def tokenize_code(text):
-    """Gets filetered fucntion tokens"""
+# This function is based on the implementation at
+# https://github.com/TheScript96/Semantic-code-search-using-BERT-and-transformer/blob/master/Part-I%20Data%20Collection%20%26%20Preprocessing.ipynb
+def code_tokenization(code):
+    func_start = 'def '
+    prior_def, func_start, post_def = code.partition(func_start)
+    string = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(post_def)
+    code_token = []
+    for word in string:
+        if (word.isalpha() and len(word) > 1):
+            lowerword = word.lower()
+            code_token.append(lowerword)
+    return word
 
-    # Remove decorators and function signatures till the def token
-    keyword = 'def '
-    before_keyword, keyword, after_keyword = text.partition(keyword)
-    words = RegexpTokenizer(r'[a-zA-Z0-9]+').tokenize(after_keyword)
-
-    # Convert function tokens to lowercase and remove single alphabet variables
-    new_words= [word.lower() for word in words if (word.isalpha() and len(word)>1) or (word.isnumeric())]
-    return new_words
-
+# This function is based on the implementation at
+# https://github.com/TheScript96/Semantic-code-search-using-BERT-and-transformer/blob/master/Part-I%20Data%20Collection%20%26%20Preprocessing.ipynb
 def get_function_details_from_string(input_str):
     return_functions = []
+    input_functions = []
     input_ast = ast.parse(input_str)
-    input_classes = [seg for seg in input_ast.body if isinstance(seg, ast.ClassDef)]
-    input_functions = [seg for seg in input_ast.body if isinstance(seg, ast.FunctionDef)]
-    for class1 in input_classes:
-        input_functions.extend([seg for seg in class1.body if isinstance(seg, ast.FunctionDef)])
+    for seg in input_ast.body:
+        if isinstance(seg, ast.FunctionDef):
+            input_functions.append(seg)
     for func in input_functions:
-        docstring = ast.get_docstring(func) if ast.get_docstring(func) else ''
+        if ast.get_docstring(func):
+            docstring = ast.get_docstring(func)
+        else:
+            docstring = 0
         function_full = astor.to_source(func)
-        function_code = function_full.replace(ast.get_docstring(func, clean=False), "") if docstring else function_full
-        function_token = tokenize_code(function_code)
-        docstring_token = tokenize_docstring(docstring.split('\n\n')[0])
+        if docstring:
+            function_code = function_full.replace(ast.get_docstring(func, clean=False), "")
+        else:
+            function_code = function_full
+        function_token = code_tokenization(function_code)
+        docstring_token = docstring_tokenization(docstring.split('\n\n')[0])
         return_functions.append((func.name, function_code, function_token, docstring, docstring_token))
     return return_functions
 
@@ -143,7 +153,7 @@ def prepare_dataset(url, query, filename, preprocessing_method):
                     result_dict["docstring_tokens"] = function_details[0][4]
                 else:
                     result_dict["docstring"] = query
-                    result_dict["docstring_tokens"] = tokenize_docstring(query.split('\n\n')[0])
+                    result_dict["docstring_tokens"] = docstring_tokenization(query.split('\n\n')[0])
                 result_dict["idx"] = idx
                 idx += 1
                 json_object = json.dumps(result_dict)
