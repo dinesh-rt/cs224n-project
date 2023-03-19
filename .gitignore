@@ -1,3 +1,6 @@
+#MACOS
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -129,3 +132,9 @@ dmypy.json
 .pyre/
 dataset/token.txt
 *.code-workspace
+
+# Python notebook Data exclusions 
+demos/CodeXGLUE
+demos/codesearchnet
+demos/semantic_search
+demos/*.zip
