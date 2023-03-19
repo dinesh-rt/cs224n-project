@@ -129,3 +129,9 @@ dmypy.json
 .pyre/
 dataset/token.txt
 *.code-workspace
+
+# Python notebook Data exclusions 
+demos/CodeXGLUE
+demos/codesearchnet
+demos/semantic_search
+demos/*.zip
