@@ -53,6 +53,8 @@ This format is proposed by CodeSearchNet Corpus, and this text is used from [Cod
   <img src="images/code_sample.png" alt="Code Sample" />
 </p>
 
+In the above format, to generate the code/docstring pairs from the GitHub Repos, we have to implement a tokenizer, which we referred from this [GitHubRepo](https://github.com/TheScript96/Semantic-code-search-using-BERT-and-transformer/tree/master). Rest of the code in dataset directory is implemented by us.
+
 ### Data Statistics
 
 Data statistics of the dataset are shown in the below table:
@@ -85,6 +87,9 @@ Details of these approaches and finer details can be found in the report link ab
 ## Demo
 We have included some sample python notebooks in [Demos](demos/) directory. 
 
+## Acknowledgements:
+1. AWS and NVIDIA for compute resources 
+2. [Heidi Zhang](mailto:chenyuz@stanford.edu) for mentoring this project. And CS224N for all the knowledge we gained in the class
 
 
 
